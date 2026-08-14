@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -11,7 +11,8 @@ import (
 	"syscall"
 )
 
-func main() {
+// Run starts the Windows port-forwarding manager application.
+func Run() {
 	if !platformSupported() {
 		platformFatal("ServerPortForward 只能在 Windows 10/11 上运行。\n可以在 macOS 上交叉编译 Windows EXE，但不能直接运行。")
 		return

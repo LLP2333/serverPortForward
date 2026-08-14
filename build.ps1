@@ -11,15 +11,32 @@ $env:GOCACHE = $BuildCache
 $env:CGO_ENABLED = "0"
 $env:GOOS = "windows"
 
+function Invoke-Go {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+
+    & go @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "go $($Arguments -join ' ') failed with exit code $LASTEXITCODE"
+    }
+}
+
 Push-Location $ProjectRoot
 try {
-    go test ./...
+    Invoke-Go @("test", "./...")
 
     $env:GOARCH = "amd64"
-    go build -trimpath -ldflags="-s -w -H=windowsgui" -o (Join-Path $DistDirectory "server-port-forward-windows-amd64.exe") .
+    Invoke-Go @(
+        "build", "-trimpath", "-ldflags=-s -w -H=windowsgui",
+        "-o", (Join-Path $DistDirectory "server-port-forward-windows-amd64.exe"),
+        "./cmd/server-port-forward"
+    )
 
     $env:GOARCH = "arm64"
-    go build -trimpath -ldflags="-s -w -H=windowsgui" -o (Join-Path $DistDirectory "server-port-forward-windows-arm64.exe") .
+    Invoke-Go @(
+        "build", "-trimpath", "-ldflags=-s -w -H=windowsgui",
+        "-o", (Join-Path $DistDirectory "server-port-forward-windows-arm64.exe"),
+        "./cmd/server-port-forward"
+    )
 }
 finally {
     Pop-Location

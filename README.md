@@ -44,7 +44,7 @@ dist/server-port-forward-windows-arm64.exe
 ```bash
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
   -trimpath -ldflags="-s -w -H=windowsgui" \
-  -o dist/server-port-forward-windows-amd64.exe .
+  -o dist/server-port-forward-windows-amd64.exe ./cmd/server-port-forward
 ```
 
 在 Windows PowerShell 中可以运行：
@@ -52,6 +52,19 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
 ```powershell
 .\build.ps1
 ```
+
+## 项目结构
+
+```text
+.
+├── cmd/server-port-forward/  # 可执行程序入口，只负责启动应用
+├── internal/app/             # 配置、规则管理、Windows 集成和本地 HTTP 服务
+│   └── web/                  # 编译进 EXE 的管理页面资源
+├── Makefile                  # macOS/Linux 测试和交叉编译
+└── build.ps1                 # Windows 测试和交叉编译
+```
+
+`internal/app` 不对仓库外暴露 API，测试与实现放在同一包内，可直接覆盖规则回滚、命令解析和 HTTP 安全边界。`cmd` 入口保持最小化，便于后续增加 CLI、Windows 服务或托盘入口而不复制业务逻辑。
 
 ## 使用方法
 
