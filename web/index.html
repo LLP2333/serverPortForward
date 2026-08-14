@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ServerPortForward</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">WINDOWS VPN BRIDGE</p>
+      <h1>端口转发管理器</h1>
+      <p class="subtitle">让 Mac 通过这台 Windows 访问 VPN 内的 TCP 服务</p>
+    </div>
+    <div class="top-actions">
+      <span id="serviceBadge" class="badge neutral">正在检查 IP Helper</span>
+      <button id="refreshButton" class="button secondary" type="button">刷新</button>
+      <button id="exitButton" class="button ghost danger-text" type="button">退出管理器</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="security-warning" aria-label="安全提示">
+      <strong>当前访问范围：任意来源</strong>
+      <span>已管理端口会对所有 Windows 网络配置文件开放。请只映射必要服务，并遵守公司的 VPN 与信息安全规定。</span>
+    </section>
+
+    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+
+    <section class="overview-grid">
+      <article class="card">
+        <div class="card-heading">
+          <div>
+            <p class="section-kicker">默认设置</p>
+            <h2>目标服务器</h2>
+          </div>
+        </div>
+        <form id="settingsForm" class="inline-form">
+          <label class="field grow">
+            <span>默认目标 IPv4</span>
+            <input id="defaultTarget" name="defaultTarget" inputmode="decimal" placeholder="例如 128.120.123.115" autocomplete="off">
+          </label>
+          <button class="button primary align-end" type="submit">保存</button>
+        </form>
+        <p class="hint">只用于预填新规则，不会修改已有映射。</p>
+      </article>
+
+      <article class="card">
+        <div class="card-heading">
+          <div>
+            <p class="section-kicker">Mac 连接入口</p>
+            <h2>Windows 局域网地址</h2>
+          </div>
+        </div>
+        <div id="localAddresses" class="address-list"></div>
+        <div class="command-box">
+          <code id="sshExample">请先创建一条目标端口为 22 的规则</code>
+          <button id="copySSH" class="button small secondary" type="button">复制</button>
+        </div>
+      </article>
+    </section>
+
+    <section id="servicePanel" class="card service-panel" hidden>
+      <div>
+        <p class="section-kicker">Windows 服务</p>
+        <h2>IP Helper 未运行</h2>
+        <p id="serviceDetail" class="hint"></p>
+      </div>
+      <button id="startServiceButton" class="button primary" type="button">确认并启动</button>
+    </section>
+
+    <section class="card">
+      <div class="card-heading split">
+        <div>
+          <p class="section-kicker">规则编辑</p>
+          <h2 id="formTitle">新增端口转发</h2>
+        </div>
+        <button id="cancelEditButton" class="button ghost" type="button" hidden>取消编辑</button>
+      </div>
+      <form id="ruleForm" class="rule-form">
+        <label class="field description-field">
+          <span>备注</span>
+          <input id="description" maxlength="80" placeholder="例如：公司 SSH" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>监听地址</span>
+          <select id="listenAddress"></select>
+        </label>
+        <label class="field">
+          <span>Windows 端口</span>
+          <input id="listenPort" type="number" min="1" max="65535" required placeholder="71">
+        </label>
+        <div class="arrow" aria-hidden="true">→</div>
+        <label class="field">
+          <span>目标 IPv4</span>
+          <input id="connectAddress" inputmode="decimal" required placeholder="128.120.123.115" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>目标端口</span>
+          <input id="connectPort" type="number" min="1" max="65535" required placeholder="22">
+        </label>
+        <button id="submitRuleButton" class="button primary submit-rule" type="submit">创建规则</button>
+      </form>
+      <p id="adoptNotice" class="adopt-notice" hidden>这是一条外部规则。保存修改后，它会被本工具接管并创建专属入站防火墙规则；原有未知防火墙规则不会被删除。</p>
+    </section>
+
+    <section class="card rules-card">
+      <div class="card-heading split">
+        <div>
+          <p class="section-kicker">Windows 实际状态</p>
+          <h2>转发规则</h2>
+        </div>
+        <button id="clearManagedButton" class="button secondary danger-text" type="button">清除已管理规则</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>备注 / 来源</th>
+              <th>Windows 监听</th>
+              <th>VPN 目标</th>
+              <th>状态</th>
+              <th class="actions-column">操作</th>
+            </tr>
+          </thead>
+          <tbody id="rulesBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyRules" class="empty-state" hidden>
+        <strong>还没有端口转发规则</strong>
+        <span>可以先创建 0.0.0.0:71 → 公司服务器:22。</span>
+      </div>
+    </section>
+
+    <details class="card diagnostics-card">
+      <summary>
+        <span>
+          <span class="section-kicker">排障信息</span>
+          <strong>诊断</strong>
+        </span>
+        <span class="summary-action">展开查看</span>
+      </summary>
+      <div class="diagnostics-content">
+        <div class="diagnostics-heading">
+          <h3>portproxy dump</h3>
+          <button id="copyDiagnostics" class="button small secondary" type="button">复制全部诊断</button>
+        </div>
+        <pre id="portProxyDump"></pre>
+        <h3>TCP 监听</h3>
+        <pre id="listenerDump"></pre>
+        <h3>最近错误</h3>
+        <pre id="lastError">无</pre>
+        <div>
+          <h3>当前告警</h3>
+          <ul id="warnings" class="warning-list"></ul>
+        </div>
+      </div>
+    </details>
+  </main>
+
+  <dialog id="testDialog" class="test-dialog">
+    <form method="dialog" class="dialog-header">
+      <div>
+        <p class="section-kicker">分层检测</p>
+        <h2>转发测试结果</h2>
+      </div>
+      <button class="button ghost" value="close">关闭</button>
+    </form>
+    <div id="testResults" class="test-results"></div>
+  </dialog>
+
+  <footer>ServerPortForward · 规则保存在 Windows 中，退出本管理器不会停止转发</footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>
