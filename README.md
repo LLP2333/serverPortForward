@@ -85,7 +85,7 @@ ssh -p 71 user@WINDOWS_LAN_IP
 
 ```cmd
 netsh interface portproxy add v4tov4 listenport=71 listenaddress=0.0.0.0 connectport=22 connectaddress=128.120.123.115 protocol=tcp
-netsh advfirewall firewall add rule name=ServerPortForward-... group=ServerPortForward dir=in action=allow enable=yes protocol=TCP localport=71 localip=any remoteip=any profile=any
+netsh advfirewall firewall add rule name=ServerPortForward-... dir=in action=allow enable=yes protocol=TCP localport=71 localip=any remoteip=any profile=any
 ```
 
 删除已管理规则时，同时删除它的专属防火墙规则。工具不会调用 shell，也不会把用户输入拼接成命令行脚本；地址和端口在执行前会严格验证。

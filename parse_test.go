@@ -44,6 +44,22 @@ Address         Port        Address         Port
 	}
 }
 
+func TestParsePortProxyShowNormalizesWindowsWildcardListener(t *testing.T) {
+	output := `Listen on ipv4:             Connect to ipv4:
+
+Address         Port        Address         Port
+--------------- ----------  --------------- ----------
+*               71          192.168.111.223 22
+`
+	want := []SystemRule{{
+		ListenAddress: "0.0.0.0", ListenPort: 71,
+		ConnectAddress: "192.168.111.223", ConnectPort: 22,
+	}}
+	if got := parsePortProxyShow(output); !reflect.DeepEqual(got, want) {
+		t.Fatalf("parsePortProxyShow() = %#v, want %#v", got, want)
+	}
+}
+
 func TestParsePortProxyShowRejectsInvalidRows(t *testing.T) {
 	output := `0.0.0.0 0 10.0.0.1 22
 0.0.0.0 71 example.com 22

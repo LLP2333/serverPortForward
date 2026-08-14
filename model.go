@@ -5,7 +5,6 @@ import "time"
 const (
 	configVersion = 1
 	appName       = "ServerPortForward"
-	firewallGroup = "ServerPortForward"
 )
 
 type Config struct {

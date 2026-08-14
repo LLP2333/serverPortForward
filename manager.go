@@ -500,7 +500,7 @@ func (m *Manager) addFirewall(ctx context.Context, rule ManagedRule) error {
 		localIP = "any"
 	}
 	_, err := m.runner.Run(ctx, "netsh.exe", "advfirewall", "firewall", "add", "rule",
-		"name="+rule.FirewallName, "group="+firewallGroup, "dir=in", "action=allow", "enable=yes",
+		"name="+rule.FirewallName, "dir=in", "action=allow", "enable=yes",
 		"protocol=TCP", "localport="+strconv.Itoa(rule.ListenPort), "localip="+localIP,
 		"remoteip=any", "profile=any")
 	return err
@@ -513,10 +513,18 @@ func (m *Manager) deleteFirewall(ctx context.Context, name string) error {
 
 func (m *Manager) firewallExists(ctx context.Context, name string) (bool, error) {
 	out, err := m.runner.Run(ctx, "netsh.exe", "advfirewall", "firewall", "show", "rule", "name="+name)
-	if err != nil {
-		return false, err
+	exists := strings.Contains(strings.ToLower(out), strings.ToLower(name))
+	if exists || err == nil {
+		return exists, nil
 	}
-	return strings.Contains(strings.ToLower(out), strings.ToLower(name)), nil
+	// netsh returns exit code 1 when no firewall rule matches. That is an
+	// expected "not found" result, not a command failure. Avoid matching the
+	// localized message text so this works on non-English Windows installs.
+	var exitErr interface{ ExitCode() int }
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, err
 }
 
 var (

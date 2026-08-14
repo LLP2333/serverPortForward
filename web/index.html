@@ -40,7 +40,7 @@
         <form id="settingsForm" class="inline-form">
           <label class="field grow">
             <span>默认目标 IPv4</span>
-            <input id="defaultTarget" name="defaultTarget" inputmode="decimal" placeholder="例如 128.120.123.115" autocomplete="off">
+            <input id="defaultTarget" name="defaultTarget" inputmode="decimal" autocomplete="off">
           </label>
           <button class="button primary align-end" type="submit">保存</button>
         </form>
@@ -82,7 +82,7 @@
       <form id="ruleForm" class="rule-form">
         <label class="field description-field">
           <span>备注</span>
-          <input id="description" maxlength="80" placeholder="例如：公司 SSH" autocomplete="off">
+          <input id="description" maxlength="80" autocomplete="off">
         </label>
         <label class="field">
           <span>监听地址</span>
@@ -90,16 +90,16 @@
         </label>
         <label class="field">
           <span>Windows 端口</span>
-          <input id="listenPort" type="number" min="1" max="65535" required placeholder="71">
+          <input id="listenPort" type="number" min="1" max="65535" required>
         </label>
         <div class="arrow" aria-hidden="true">→</div>
         <label class="field">
           <span>目标 IPv4</span>
-          <input id="connectAddress" inputmode="decimal" required placeholder="128.120.123.115" autocomplete="off">
+          <input id="connectAddress" inputmode="decimal" required autocomplete="off">
         </label>
         <label class="field">
           <span>目标端口</span>
-          <input id="connectPort" type="number" min="1" max="65535" required placeholder="22">
+          <input id="connectPort" type="number" min="1" max="65535" required>
         </label>
         <button id="submitRuleButton" class="button primary submit-rule" type="submit">创建规则</button>
       </form>

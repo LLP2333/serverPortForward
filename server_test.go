@@ -80,3 +80,23 @@ func TestDecodeJSONRejectsTrailingData(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 }
+
+func TestWebInputsDoNotShowPlaceholderExamples(t *testing.T) {
+	page, err := embeddedWeb.ReadFile("web/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(page), "placeholder=") {
+		t.Fatal("input placeholder example is still present")
+	}
+}
+
+func TestHiddenElementsCannotBeShownByComponentStyles(t *testing.T) {
+	stylesheet, err := embeddedWeb.ReadFile("web/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(stylesheet), "[hidden] { display: none !important; }") {
+		t.Fatal("hidden elements are not protected from display overrides")
+	}
+}

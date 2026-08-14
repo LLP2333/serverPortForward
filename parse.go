@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,19 +14,23 @@ func parsePortProxyShow(output string) []SystemRule {
 		if len(fields) != 4 {
 			continue
 		}
-		listenIP := net.ParseIP(fields[0])
-		connectIP := net.ParseIP(fields[2])
+		// Windows renders a wildcard v4tov4 listener as "*" when the rule was
+		// created with listenaddress=* (and may omit listenaddress from dump).
+		// Normalize it to the canonical value used by the rest of the app so the
+		// rule remains visible, editable, and deletable.
+		listenAddress, err0 := normalizeIPv4(fields[0])
+		connectAddress, err3 := normalizeIPv4(fields[2])
 		listenPort, err1 := strconv.Atoi(fields[1])
 		connectPort, err2 := strconv.Atoi(fields[3])
-		if listenIP == nil || listenIP.To4() == nil || connectIP == nil || connectIP.To4() == nil || err1 != nil || err2 != nil {
+		if err0 != nil || err1 != nil || err2 != nil || err3 != nil {
 			continue
 		}
 		if validatePort(listenPort) != nil || validatePort(connectPort) != nil {
 			continue
 		}
 		rule := SystemRule{
-			ListenAddress: listenIP.To4().String(), ListenPort: listenPort,
-			ConnectAddress: connectIP.To4().String(), ConnectPort: connectPort,
+			ListenAddress: listenAddress, ListenPort: listenPort,
+			ConnectAddress: connectAddress, ConnectPort: connectPort,
 		}
 		if !seen[rule.key()] {
 			rules = append(rules, rule)

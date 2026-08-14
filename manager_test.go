@@ -48,6 +48,11 @@ type fakeWindowsRunner struct {
 	failDeleteKey   string
 }
 
+type exitCodeError int
+
+func (e exitCodeError) Error() string { return fmt.Sprintf("exit status %d", e) }
+func (e exitCodeError) ExitCode() int { return int(e) }
+
 func newFakeWindowsRunner(rules ...SystemRule) *fakeWindowsRunner {
 	f := &fakeWindowsRunner{rules: map[string]SystemRule{}, firewalls: map[string]bool{}}
 	for _, rule := range rules {
@@ -106,6 +111,9 @@ func (f *fakeWindowsRunner) Run(_ context.Context, name string, args ...string) 
 		name := valueFor(args, "name")
 		switch args[2] {
 		case "add":
+			if valueFor(args, "group") != "" {
+				return "'group' is not a valid argument for this command", errors.New("exit status 1")
+			}
 			if f.failFirewallAdd {
 				return "firewall failed", errors.New("firewall failed")
 			}
@@ -118,7 +126,10 @@ func (f *fakeWindowsRunner) Run(_ context.Context, name string, args ...string) 
 			if f.firewalls[name] {
 				return "Rule Name: " + name, nil
 			}
-			return "No rules match", nil
+			return "No rules match the specified criteria.", &CommandError{
+				Name: "netsh.exe", Args: append([]string(nil), args...),
+				Output: "No rules match the specified criteria.", Err: exitCodeError(1),
+			}
 		}
 	}
 	return "", fmt.Errorf("unexpected netsh command: %s", call)
@@ -163,6 +174,39 @@ func TestCreateRuleRollsBackWhenFirewallFails(t *testing.T) {
 	}
 }
 
+func TestCreateRuleUsesSupportedFirewallArguments(t *testing.T) {
+	runner := newFakeWindowsRunner()
+	manager := NewManager(runner, newMemoryConfigRepository())
+	if err := manager.CreateRule(context.Background(), RuleInput{
+		ListenAddress: "0.0.0.0", ListenPort: 71,
+		ConnectAddress: "10.0.0.8", ConnectPort: 22,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var firewallCall string
+	for _, call := range runner.calls {
+		if strings.Contains(call, "advfirewall firewall add rule") {
+			firewallCall = call
+			break
+		}
+	}
+	if firewallCall == "" {
+		t.Fatal("firewall add command was not called")
+	}
+	if strings.Contains(firewallCall, " group=") {
+		t.Fatalf("unsupported group parameter was used: %s", firewallCall)
+	}
+	for _, argument := range []string{
+		"dir=in", "action=allow", "enable=yes", "protocol=TCP",
+		"localport=71", "localip=any", "remoteip=any", "profile=any",
+	} {
+		if !strings.Contains(firewallCall, " "+argument) {
+			t.Errorf("firewall command is missing %s: %s", argument, firewallCall)
+		}
+	}
+}
+
 func TestCreateRuleRollsBackWhenConfigSaveFails(t *testing.T) {
 	runner := newFakeWindowsRunner()
 	repo := newMemoryConfigRepository()
@@ -198,6 +242,51 @@ func TestDeleteExternalRuleDoesNotTouchFirewall(t *testing.T) {
 		if strings.Contains(call, "advfirewall firewall delete") {
 			t.Fatalf("external deletion must not call firewall delete: %s", call)
 		}
+	}
+}
+
+func TestDeleteManagedRuleWithMissingFirewall(t *testing.T) {
+	rule := SystemRule{"0.0.0.0", 71, "10.0.0.8", 22}
+	runner := newFakeWindowsRunner(rule)
+	repo := newMemoryConfigRepository()
+	repo.cfg.ManagedRules = []ManagedRule{{
+		ID: "managed", ListenAddress: rule.ListenAddress, ListenPort: rule.ListenPort,
+		ConnectAddress: rule.ConnectAddress, ConnectPort: rule.ConnectPort,
+		FirewallName: "ServerPortForward-managed",
+	}}
+	manager := NewManager(runner, repo)
+
+	if err := manager.DeleteRule(context.Background(), RuleKeyRequest{rule.ListenAddress, rule.ListenPort}); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.rules) != 0 || len(repo.cfg.ManagedRules) != 0 {
+		t.Fatalf("managed rule was not removed: rules=%#v config=%#v", runner.rules, repo.cfg)
+	}
+}
+
+func TestUpdateManagedRuleRepairsMissingFirewall(t *testing.T) {
+	rule := SystemRule{"0.0.0.0", 71, "10.0.0.8", 22}
+	runner := newFakeWindowsRunner(rule)
+	repo := newMemoryConfigRepository()
+	repo.cfg.ManagedRules = []ManagedRule{{
+		ID: "managed", ListenAddress: rule.ListenAddress, ListenPort: rule.ListenPort,
+		ConnectAddress: rule.ConnectAddress, ConnectPort: rule.ConnectPort,
+		FirewallName: "ServerPortForward-managed",
+	}}
+	manager := NewManager(runner, repo)
+
+	err := manager.UpdateRule(context.Background(), UpdateRuleRequest{
+		OriginalListenAddress: rule.ListenAddress, OriginalListenPort: rule.ListenPort,
+		Rule: RuleInput{
+			Description: "SSH", ListenAddress: rule.ListenAddress, ListenPort: rule.ListenPort,
+			ConnectAddress: "10.0.0.9", ConnectPort: 22,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !runner.firewalls["ServerPortForward-managed"] {
+		t.Fatal("missing firewall rule was not repaired")
 	}
 }
 
